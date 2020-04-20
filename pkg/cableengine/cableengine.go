@@ -66,11 +66,10 @@ func (i *engine) GetLocalEndpoint() *types.SubmarinerEndpoint {
 
 func (i *engine) StartEngine() error {
 
-	klog.Infof("CableEngine controller started, driver: %q", i.driver.GetName())
 	if err := i.startDriver(); err != nil {
 		return err
 	}
-
+	klog.Infof("CableEngine controller started, driver: %q", i.driver.GetName())
 	return nil
 
 }

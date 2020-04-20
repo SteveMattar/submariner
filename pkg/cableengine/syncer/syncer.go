@@ -2,7 +2,6 @@ package syncer
 
 import (
 	"fmt"
-	"os"
 	"reflect"
 	"strconv"
 	"sync"
@@ -129,6 +128,10 @@ func (i *CableEngineSyncer) cleanupStaleGatewayEntries() error {
 
 func isGatewayStale(gateway v1.Gateway) (bool, error) {
 
+	if gateway.ObjectMeta.Annotations == nil {
+		return true, nil
+	}
+
 	timestamp, ok := gateway.ObjectMeta.Annotations[updateTimestampAnnotation]
 	if !ok {
 		return true, fmt.Errorf("%q annotation not found", updateTimestampAnnotation)
@@ -151,20 +154,15 @@ func (i *CableEngineSyncer) getLastSyncedGateway(name string) (*v1.Gateway, erro
 }
 
 func (i *CableEngineSyncer) generateGatewayObject() (*v1.Gateway, error) {
-	var hostName string
-	var err error
-
-	if hostName, err = os.Hostname(); err != nil {
-		return nil, err
-	}
+	localEndpoint := i.engine.GetLocalEndpoint()
 
 	gateway := v1.Gateway{
 		Status: v1.GatewayStatus{
 			Version:       i.version,
-			LocalEndpoint: i.engine.GetLocalEndpoint().Spec,
+			LocalEndpoint: localEndpoint.Spec,
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        hostName,
+			Name:        localEndpoint.Spec.Hostname,
 			Annotations: map[string]string{updateTimestampAnnotation: strconv.FormatInt(time.Now().UTC().Unix(), 10)}},
 	}
 
@@ -173,6 +171,7 @@ func (i *CableEngineSyncer) generateGatewayObject() (*v1.Gateway, error) {
 
 	connections, err := i.engine.ListCableConnections()
 	if err != nil {
+		gateway.Status.StatusFailure = fmt.Sprintf("error getting driver connections: %s", err)
 		klog.Errorf("error getting driver connections: %s", err)
 		return nil, err
 	}
